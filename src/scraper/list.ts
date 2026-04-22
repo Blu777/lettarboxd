@@ -18,12 +18,26 @@ export class ListScraper implements Scraper {
         const allMovieLinks = await this.getAllMovieLinks(processUrl);
         const linksToProcess = typeof this.take === 'number' ? allMovieLinks.slice(0, this.take) : allMovieLinks;
 
-        const movies = await Bluebird.map(linksToProcess, link => {
-            return getMovie(link);
+        const results = await Bluebird.map(linksToProcess, async (link): Promise<LetterboxdMovie | null> => {
+            try {
+                return await getMovie(link);
+            } catch (err) {
+                // Do not let a single broken film page tear down the whole sync.
+                // See https://github.com/ryanpag3/lettarrboxd/issues/42
+                const message = err instanceof Error ? err.message : String(err);
+                logger.warn(`Skipping movie "${link}" due to scrape error: ${message}`);
+                return null;
+            }
         }, {
             concurrency: 10
         });
-        
+
+        const movies = results.filter((m): m is LetterboxdMovie => m !== null);
+
+        if (movies.length < linksToProcess.length) {
+            logger.warn(`Skipped ${linksToProcess.length - movies.length} of ${linksToProcess.length} movies due to scrape errors.`);
+        }
+
         return movies;
     }
 

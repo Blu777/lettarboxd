@@ -221,6 +221,67 @@ describe('movie scraper', () => {
       expect(result.imdbId).toBeNull();
     });
 
+    it('should extract film ID from data-postered-identifier JSON (issue #42)', async () => {
+      const mockHtml = `
+        <html>
+          <body>
+            <h1 class="primaryname">Avatar: Fire and Ash</h1>
+            <div data-postered-identifier='{"uid":"film:70007","type":"film"}'></div>
+            <a data-track-action="TMDB" href="https://www.themoviedb.org/movie/1">x</a>
+          </body>
+        </html>
+      `;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        text: async () => mockHtml,
+      });
+
+      const result = await getMovie('/film/avatar-fire-and-ash/');
+      expect(result.id).toBe(70007);
+    });
+
+    it('should extract film ID from inline __BXD_DATA script (issue #42)', async () => {
+      const mockHtml = `
+        <html>
+          <body>
+            <h1 class="primaryname">Some Film</h1>
+            <script>
+              window.__BXD_DATA = { viewingable: { uid: "film:12321", type: "film" } };
+            </script>
+          </body>
+        </html>
+      `;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        text: async () => mockHtml,
+      });
+
+      const result = await getMovie('/film/some-film/');
+      expect(result.id).toBe(12321);
+    });
+
+    it('should prefer legacy data-film-id when both old and new markup exist', async () => {
+      const mockHtml = `
+        <html>
+          <body>
+            <h1 class="primaryname">Dual Markup</h1>
+            <div class="film-poster" data-film-id="55555"><img src="x.jpg" /></div>
+            <div data-postered-identifier='{"uid":"film:99999"}'></div>
+          </body>
+        </html>
+      `;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        text: async () => mockHtml,
+      });
+
+      const result = await getMovie('/film/dual-markup/');
+      expect(result.id).toBe(55555);
+    });
+
     it('should handle malformed release date link', async () => {
       const mockHtml = `
         <html>

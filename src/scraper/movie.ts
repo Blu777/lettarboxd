@@ -77,12 +77,50 @@ function extractImdbId($: cheerio.CheerioAPI): string|null {
 }
 
 function extractLetterboxdId($: cheerio.CheerioAPI): number {
-    const filmId = $('.film-poster img').closest('[data-film-id]').attr('data-film-id');
-    if (!filmId) {
-        throw new Error('Could not find Letterboxd film ID');
+    // Strategy 1 (legacy): explicit data-film-id attribute.
+    // Kept first for backwards compatibility with older/cached pages.
+    const legacyId = $('.film-poster img').closest('[data-film-id]').attr('data-film-id');
+    if (legacyId && /^\d+$/.test(legacyId)) {
+        return parseInt(legacyId, 10);
     }
-    
-    return parseInt(filmId, 10);
+
+    // Strategy 2: current markup exposes a JSON payload in data-postered-identifier,
+    // e.g. data-postered-identifier='{"uid":"film:70007", ...}'.
+    // See https://github.com/ryanpag3/lettarrboxd/issues/42
+    const posteredRaw = $('[data-postered-identifier]').first().attr('data-postered-identifier');
+    if (posteredRaw) {
+        const idFromJson = parseFilmUidFromJson(posteredRaw);
+        if (idFromJson !== null) return idFromJson;
+
+        // Some pages may embed just "film:XXXXX" without full JSON; try regex fallback.
+        const direct = posteredRaw.match(/film:(\d+)/);
+        if (direct) return parseInt(direct[1], 10);
+    }
+
+    // Strategy 3: inline script setting window.__BXD_DATA with viewingable.uid = "film:XXXXX".
+    const scripts = $('script').toArray();
+    for (const el of scripts) {
+        const content = $(el).html();
+        if (!content) continue;
+        const match = content.match(/viewingable[^}]*?uid["'\s:]+["']film:(\d+)["']/);
+        if (match) return parseInt(match[1], 10);
+    }
+
+    throw new Error('Could not find Letterboxd film ID');
+}
+
+function parseFilmUidFromJson(raw: string): number | null {
+    try {
+        const parsed = JSON.parse(raw);
+        const uid: unknown = parsed?.uid;
+        if (typeof uid === 'string') {
+            const m = uid.match(/^film:(\d+)$/);
+            if (m) return parseInt(m[1], 10);
+        }
+    } catch {
+        // Not JSON; callers will try other strategies.
+    }
+    return null;
 }
 
 function extractPublishedYear($: cheerio.CheerioAPI): number|null {
