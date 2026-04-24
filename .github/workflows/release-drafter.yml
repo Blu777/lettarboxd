@@ -8,6 +8,11 @@ on:
 permissions:
   contents: read
 
+# release-drafter@v6 is still Node 20 at time of writing; opt the runner
+# into Node 24 explicitly to silence the deprecation warning.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   update_release_draft:
     permissions:

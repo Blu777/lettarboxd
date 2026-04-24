@@ -6,12 +6,18 @@ on:
     paths: ['README.md']
   workflow_dispatch:
 
+# peter-evans/dockerhub-description@v4 has not yet published a Node 24
+# release; opt the runner into Node 24 explicitly to avoid the
+# deprecation warning.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   update-docker-hub:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Update Docker Hub Description
         uses: peter-evans/dockerhub-description@v4
