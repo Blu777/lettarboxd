@@ -45,7 +45,12 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          # arm64 previously built via QEMU emulation on the amd64 runner,
+          # which crashed with SIGILL (exit 132) inside `yarn install` when
+          # QEMU hit a Node instruction it could not emulate. Dropping arm64
+          # keeps the build fast and green. If arm64 is ever needed, use a
+          # matrix with a native `ubuntu-24.04-arm` runner instead of QEMU.
+          platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
