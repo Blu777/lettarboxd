@@ -1,10 +1,17 @@
-# Lettarrboxd
+# Lettarboxd (Blu777 fork)
 
 Automatically sync your Letterboxd lists to Radarr for seamless movie management.
 
+> This is a maintained fork of [ryanpag3/lettarrboxd](https://github.com/ryanpag3/lettarrboxd)
+> that ships the fix for
+> [issue #42](https://github.com/ryanpag3/lettarrboxd/issues/42)
+> (Letterboxd changed its film-page markup, breaking film-ID extraction).
+> Published on Docker Hub as
+> [`blu777/lettarboxd`](https://hub.docker.com/r/blu777/lettarboxd).
+
 ## Overview
 
-Lettarrboxd is an application that monitors your Letterboxd lists (watchlists, regular lists, watched movies, filmographies, collections, etc.) and automatically pushes new movies to Radarr. It runs continuously, checking for updates at configurable intervals and only processing new additions to avoid duplicate API calls.
+Lettarboxd is an application that monitors your Letterboxd lists (watchlists, regular lists, watched movies, filmographies, collections, etc.) and automatically pushes new movies to Radarr. It runs continuously, checking for updates at configurable intervals and only processing new additions to avoid duplicate API calls.
 
 ## Supported Letterboxd URLs
 
@@ -55,34 +62,49 @@ LETTERBOXD_URL=https://letterboxd.com/writer/aaron-sorkin/
 
 ### Docker
 
+Pull the image from Docker Hub:
+
+```bash
+docker pull blu777/lettarboxd:v1.0
+```
+
+Available tags:
+
+| Tag | Description |
+|-----|-------------|
+| `v1.0`, `v1.0.0` | Pinned to the 1.0 release (recommended for production). |
+| `v1` | Latest 1.x release. |
+| `latest` | Latest release on the `main` branch. |
+| `staging` | Head of `main`; may be unstable. |
+
 ```bash
 docker run -d \
-  --name lettarrboxd \
+  --name lettarboxd \
   -e LETTERBOXD_URL=https://letterboxd.com/your_username/watchlist/ \
   -e RADARR_API_URL=http://your-radarr:7878 \
   -e RADARR_API_KEY=your_api_key \
   -e RADARR_QUALITY_PROFILE="HD-1080p" \
   -e RADARR_TAGS="watchlist,must-watch" \
   -e DRY_RUN=false \
-  ryanpage/lettarrboxd:latest
+  blu777/lettarboxd:v1.0
 ```
 
 For testing purposes, you can enable dry run mode:
 ```bash
 docker run -d \
-  --name lettarrboxd-test \
+  --name lettarboxd-test \
   -e LETTERBOXD_URL=https://letterboxd.com/your_username/watchlist/ \
   -e RADARR_API_URL=http://your-radarr:7878 \
   -e RADARR_API_KEY=your_api_key \
   -e RADARR_QUALITY_PROFILE="HD-1080p" \
   -e DRY_RUN=true \
-  ryanpage/lettarrboxd:latest
+  blu777/lettarboxd:v1.0
 ```
 See [docker-compose.yaml](./docker-compose.yaml) for complete example.
 
 ## Watching Multiple Lists
 
-To monitor multiple Letterboxd lists simultaneously, deploy one lettarrboxd instance per list. Each instance operates independently with its own configuration, allowing you to:
+To monitor multiple Letterboxd lists simultaneously, deploy one lettarboxd instance per list. Each instance operates independently with its own configuration, allowing you to:
 
 - Watch different lists with different quality profiles
 - Use custom tags to organize movies from different sources
@@ -93,9 +115,9 @@ To monitor multiple Letterboxd lists simultaneously, deploy one lettarrboxd inst
 
 ```yaml
 services:
-  lettarrboxd-watchlist:
-    image: ryanpage/lettarrboxd:latest
-    container_name: lettarrboxd-watchlist
+  lettarboxd-watchlist:
+    image: blu777/lettarboxd:v1.0
+    container_name: lettarboxd-watchlist
     environment:
       - LETTERBOXD_URL=https://letterboxd.com/your_username/watchlist/
       - RADARR_API_URL=http://radarr:7878
@@ -107,9 +129,9 @@ services:
       - ./data/watchlist:/data
     restart: unless-stopped
 
-  lettarrboxd-criterion:
-    image: ryanpage/lettarrboxd:latest
-    container_name: lettarrboxd-criterion
+  lettarboxd-criterion:
+    image: blu777/lettarboxd:v1.0
+    container_name: lettarboxd-criterion
     environment:
       - LETTERBOXD_URL=https://letterboxd.com/criterion/list/the-criterion-collection/
       - RADARR_API_URL=http://radarr:7878
@@ -121,9 +143,9 @@ services:
       - ./data/criterion:/data
     restart: unless-stopped
 
-  lettarrboxd-nolan:
-    image: ryanpage/lettarrboxd:latest
-    container_name: lettarrboxd-nolan
+  lettarboxd-nolan:
+    image: blu777/lettarboxd:v1.0
+    container_name: lettarboxd-nolan
     environment:
       - LETTERBOXD_URL=https://letterboxd.com/director/christopher-nolan/
       - RADARR_API_URL=http://radarr:7878
@@ -141,7 +163,7 @@ services:
 ```bash
 # Watch your personal watchlist
 docker run -d \
-  --name lettarrboxd-watchlist \
+  --name lettarboxd-watchlist \
   -e LETTERBOXD_URL=https://letterboxd.com/your_username/watchlist/ \
   -e RADARR_API_URL=http://radarr:7878 \
   -e RADARR_API_KEY=your_api_key \
@@ -149,11 +171,11 @@ docker run -d \
   -e RADARR_TAGS="watchlist,personal" \
   -e CHECK_INTERVAL_MINUTES=60 \
   -v ./data/watchlist:/data \
-  ryanpage/lettarrboxd:latest
+  blu777/lettarboxd:v1.0
 
 # Watch the Criterion Collection
 docker run -d \
-  --name lettarrboxd-criterion \
+  --name lettarboxd-criterion \
   -e LETTERBOXD_URL=https://letterboxd.com/criterion/list/the-criterion-collection/ \
   -e RADARR_API_URL=http://radarr:7878 \
   -e RADARR_API_KEY=your_api_key \
@@ -161,11 +183,11 @@ docker run -d \
   -e RADARR_TAGS="criterion,classics" \
   -e CHECK_INTERVAL_MINUTES=120 \
   -v ./data/criterion:/data \
-  ryanpage/lettarrboxd:latest
+  blu777/lettarboxd:v1.0
 
 # Watch Christopher Nolan's filmography
 docker run -d \
-  --name lettarrboxd-nolan \
+  --name lettarboxd-nolan \
   -e LETTERBOXD_URL=https://letterboxd.com/director/christopher-nolan/ \
   -e RADARR_API_URL=http://radarr:7878 \
   -e RADARR_API_KEY=your_api_key \
@@ -173,12 +195,12 @@ docker run -d \
   -e RADARR_TAGS="nolan,director-filmography" \
   -e CHECK_INTERVAL_MINUTES=1440 \
   -v ./data/nolan:/data \
-  ryanpage/lettarrboxd:latest
+  blu777/lettarboxd:v1.0
 ```
 
 ### Best Practices for Multi-List Setup
 
-1. **Unique Container Names**: Each instance must have a unique container name (e.g., `lettarrboxd-watchlist`, `lettarrboxd-criterion`)
+1. **Unique Container Names**: Each instance must have a unique container name (e.g., `lettarboxd-watchlist`, `lettarboxd-criterion`)
 
 2. **Separate Data Directories**: Use different volume mounts for each instance to maintain independent state tracking:
    ```yaml
@@ -241,8 +263,8 @@ docker run -d \
 
 ```bash
 # Clone the repository
-git clone https://github.com/ryanpag3/lettarrboxd.git
-cd lettarrboxd
+git clone https://github.com/Blu777/lettarboxd.git
+cd lettarboxd
 
 # Install dependencies
 yarn install
@@ -289,7 +311,7 @@ When `NODE_ENV=development`, the application:
 
 **Docker container won't start**
 - Verify all required environment variables are set
-- Check container logs: `docker logs lettarrboxd`
+- Check container logs: `docker logs lettarboxd`
 
 ## License
 
@@ -297,4 +319,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Legal Disclaimer
 
-This project is intended for use with legally sourced media only. It is designed to help users organize and manage their personal media collections. The developers of Lettarrboxd do not condone or support piracy in any form. Users are solely responsible for ensuring their use of this software complies with all applicable laws and regulations in their jurisdiction.
+This project is intended for use with legally sourced media only. It is designed to help users organize and manage their personal media collections. The developers of Lettarboxd do not condone or support piracy in any form. Users are solely responsible for ensuring their use of this software complies with all applicable laws and regulations in their jurisdiction.
