@@ -223,6 +223,85 @@ describe('ListScraper', () => {
       await expect(scraper.getMovies()).rejects.toThrow('Failed to fetch list page: 500');
     });
 
+    it('should skip movies that fail to scrape and continue with the rest (issue #42)', async () => {
+      const mockHtml = `
+        <html>
+          <body>
+            <div class="react-component" data-target-link="/film/good/"></div>
+            <div class="react-component" data-target-link="/film/bad/"></div>
+            <div class="react-component" data-target-link="/film/also-good/"></div>
+          </body>
+        </html>
+      `;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        text: async () => mockHtml,
+      });
+
+      const good = {
+        id: 1,
+        name: 'Good',
+        slug: '/film/good/',
+        tmdbId: '1',
+        imdbId: null,
+        publishedYear: null,
+      };
+      const alsoGood = {
+        id: 3,
+        name: 'Also Good',
+        slug: '/film/also-good/',
+        tmdbId: '3',
+        imdbId: null,
+        publishedYear: null,
+      };
+
+      (movieModule.getMovie as jest.Mock)
+        .mockResolvedValueOnce(good)
+        .mockRejectedValueOnce(new Error('boom'))
+        .mockResolvedValueOnce(alsoGood);
+
+      const scraper = new ListScraper('https://letterboxd.com/user/watchlist/');
+      const movies = await scraper.getMovies();
+
+      expect(movies).toHaveLength(2);
+      expect(movies).toEqual(expect.arrayContaining([good, alsoGood]));
+    });
+
+    it('should tolerate non-Error rejection values from getMovie', async () => {
+      const mockHtml = `
+        <html>
+          <body>
+            <div class="react-component" data-target-link="/film/good/"></div>
+            <div class="react-component" data-target-link="/film/bad/"></div>
+          </body>
+        </html>
+      `;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        text: async () => mockHtml,
+      });
+
+      const good = {
+        id: 1,
+        name: 'Good',
+        slug: '/film/good/',
+        tmdbId: '1',
+        imdbId: null,
+        publishedYear: null,
+      };
+
+      (movieModule.getMovie as jest.Mock)
+        .mockResolvedValueOnce(good)
+        .mockRejectedValueOnce('string error, not an Error instance');
+
+      const scraper = new ListScraper('https://letterboxd.com/user/watchlist/');
+      const movies = await scraper.getMovies();
+
+      expect(movies).toEqual([good]);
+    });
+
     it('should handle empty movie list', async () => {
       const mockHtml = `
         <html>

@@ -262,6 +262,50 @@ describe('movie scraper', () => {
       expect(result.id).toBe(12321);
     });
 
+    it('should extract film ID via regex fallback when data-postered-identifier is not JSON (issue #42)', async () => {
+      const mockHtml = `
+        <html>
+          <body>
+            <h1 class="primaryname">Raw Poster Marker</h1>
+            <div data-postered-identifier="film:42424"></div>
+          </body>
+        </html>
+      `;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        text: async () => mockHtml,
+      });
+
+      const result = await getMovie('/film/raw-poster/');
+      expect(result.id).toBe(42424);
+    });
+
+    it('should fall through to script strategy when JSON uid is not a film uid (issue #42)', async () => {
+      // JSON parses fine but uid is "tv:...", forcing parseFilmUidFromJson
+      // to return null, and the regex fallback does not match "film:" either.
+      // The inline __BXD_DATA script should then resolve the film id.
+      const mockHtml = `
+        <html>
+          <body>
+            <h1 class="primaryname">TV Marked Page</h1>
+            <div data-postered-identifier='{"uid":"tv:12345"}'></div>
+            <script>
+              window.__BXD_DATA = { viewingable: { uid: "film:98765" } };
+            </script>
+          </body>
+        </html>
+      `;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        text: async () => mockHtml,
+      });
+
+      const result = await getMovie('/film/tv-marked/');
+      expect(result.id).toBe(98765);
+    });
+
     it('should prefer legacy data-film-id when both old and new markup exist', async () => {
       const mockHtml = `
         <html>

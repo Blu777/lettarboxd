@@ -45,7 +45,10 @@ jobs:
         run: yarn tsc --noEmit
 
       - name: Run unit tests with coverage
-        run: yarn test:coverage
+        # Integration tests (*.itest.ts) hit the live Letterboxd site
+        # and are blocked (403) from GitHub Actions IPs, so exclude them
+        # from CI. Run them locally via `yarn test:integration`.
+        run: yarn jest --coverage --testPathIgnorePatterns=itest
         env:
           CI: true
 
