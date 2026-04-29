@@ -259,5 +259,76 @@ describe('CollectionsScraper', () => {
 
       await expect(scraper.getMovies()).rejects.toThrow('Failed to fetch collections page: 404');
     });
+
+    it('should skip movies that fail to scrape and continue with the rest', async () => {
+      const mockHtml = `
+        <div class="react-component" data-target-link="/film/good/"></div>
+        <div class="react-component" data-target-link="/film/bad/"></div>
+        <div class="react-component" data-target-link="/film/also-good/"></div>
+      `;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        text: async () => mockHtml,
+      });
+
+      const good = {
+        id: 1,
+        name: 'Good',
+        slug: '/film/good/',
+        tmdbId: '1',
+        imdbId: null,
+        publishedYear: null,
+      };
+      const alsoGood = {
+        id: 3,
+        name: 'Also Good',
+        slug: '/film/also-good/',
+        tmdbId: '3',
+        imdbId: null,
+        publishedYear: null,
+      };
+
+      (getMovie as jest.Mock)
+        .mockResolvedValueOnce(good)
+        .mockRejectedValueOnce(new Error('boom'))
+        .mockResolvedValueOnce(alsoGood);
+
+      const scraper = new CollectionsScraper('https://letterboxd.com/films/in/collection/');
+      const movies = await scraper.getMovies();
+
+      expect(movies).toHaveLength(2);
+      expect(movies).toEqual(expect.arrayContaining([good, alsoGood]));
+    });
+
+    it('should tolerate non-Error rejection values from getMovie', async () => {
+      const mockHtml = `
+        <div class="react-component" data-target-link="/film/good/"></div>
+        <div class="react-component" data-target-link="/film/bad/"></div>
+      `;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        text: async () => mockHtml,
+      });
+
+      const good = {
+        id: 1,
+        name: 'Good',
+        slug: '/film/good/',
+        tmdbId: '1',
+        imdbId: null,
+        publishedYear: null,
+      };
+
+      (getMovie as jest.Mock)
+        .mockResolvedValueOnce(good)
+        .mockRejectedValueOnce('string error, not an Error instance');
+
+      const scraper = new CollectionsScraper('https://letterboxd.com/films/in/collection/');
+      const movies = await scraper.getMovies();
+
+      expect(movies).toEqual([good]);
+    });
   });
 });

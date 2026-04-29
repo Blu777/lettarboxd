@@ -9,18 +9,36 @@ export class PopularScraper implements Scraper {
     constructor(private url: string, private take?: number, private strategy?: 'oldest' | 'newest') {}
 
     async getMovies(): Promise<LetterboxdMovie[]> {
+        let urlToTransform = this.url;
+
+        if (this.strategy === 'oldest') {
+            urlToTransform = this.url.replace(/\/$/, '') + '/by/release-date-earliest/';
+        }
+
         // Transform URL to AJAX endpoint
         // /films/popular/ -> /films/ajax/popular/
-        const ajaxUrl = this.transformToAjaxUrl(this.url);
+        const ajaxUrl = this.transformToAjaxUrl(urlToTransform);
 
         const allMovieLinks = await this.getAllMovieLinks(ajaxUrl);
         const linksToProcess = typeof this.take === 'number' ? allMovieLinks.slice(0, this.take) : allMovieLinks;
 
-        const movies = await Bluebird.map(linksToProcess, link => {
-            return getMovie(link);
+        const results = await Bluebird.map(linksToProcess, async (link): Promise<LetterboxdMovie | null> => {
+            try {
+                return await getMovie(link);
+            } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                logger.warn(`Skipping movie "${link}" due to scrape error: ${message}`);
+                return null;
+            }
         }, {
             concurrency: 10
         });
+
+        const movies = results.filter((m): m is LetterboxdMovie => m !== null);
+
+        if (movies.length < linksToProcess.length) {
+            logger.warn(`Skipped ${linksToProcess.length - movies.length} of ${linksToProcess.length} movies due to scrape errors.`);
+        }
 
         return movies;
     }
@@ -29,9 +47,11 @@ export class PopularScraper implements Scraper {
         // Remove trailing slash for easier manipulation
         const cleanUrl = url.replace(/\/$/, '');
 
-        // Transform /films/popular to /films/ajax/popular
-        if (cleanUrl === 'https://letterboxd.com/films/popular') {
-            return 'https://letterboxd.com/films/ajax/popular/';
+        // Transform /films/popular... to /films/ajax/popular...
+        // Handles both /films/popular and /films/popular/by/release-date-earliest
+        if (cleanUrl.startsWith('https://letterboxd.com/films/popular')) {
+            const suffix = cleanUrl.replace('https://letterboxd.com/films/popular', '');
+            return 'https://letterboxd.com/films/ajax/popular' + suffix + '/';
         }
 
         // If already an AJAX URL, return as is

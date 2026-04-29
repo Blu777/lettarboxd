@@ -375,5 +375,47 @@ describe('radarr API', () => {
 
       await expect(upsertMovies(mockMovies)).rejects.toThrow('Could not get root folder');
     });
+
+    it('should limit concurrency when adding movies to Radarr', async () => {
+      const manyMovies = Array.from({ length: 25 }, (_, i) => ({
+        id: i + 1,
+        name: `Movie ${i + 1}`,
+        slug: `/film/movie${i + 1}/`,
+        tmdbId: `${i + 100}`,
+        imdbId: null,
+        publishedYear: null,
+      }));
+
+      mockAxiosInstance.get
+        .mockResolvedValueOnce({
+          data: [{ id: 2, name: 'HD-1080p' }],
+        })
+        .mockResolvedValueOnce({
+          data: [{ id: 1, path: '/movies' }],
+        })
+        .mockResolvedValue({
+          data: [{ id: 1, label: 'letterboxd' }],
+        });
+
+      let maxConcurrent = 0;
+      let currentConcurrent = 0;
+
+      mockAxiosInstance.post.mockImplementation(async (url: string) => {
+        if (url === '/api/v3/tag') {
+          return { data: { id: 1, label: 'letterboxd' } };
+        }
+        currentConcurrent++;
+        if (currentConcurrent > maxConcurrent) {
+          maxConcurrent = currentConcurrent;
+        }
+        await new Promise(resolve => setTimeout(resolve, 10));
+        currentConcurrent--;
+        return { data: { id: 1, title: 'Movie' } };
+      });
+
+      await upsertMovies(manyMovies);
+
+      expect(maxConcurrent).toBeLessThanOrEqual(10);
+    });
   });
 });

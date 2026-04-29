@@ -155,6 +155,8 @@ export async function upsertMovies(movies: LetterboxdMovie[]): Promise<void> {
 
     await Bluebird.map(movies, movie => {
         return addMovie(movie, qualityProfileId, rootFolderPath, tagIds, env.RADARR_MINIMUM_AVAILABILITY);
+    }, {
+        concurrency: 5
     });
 }
 
