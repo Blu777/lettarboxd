@@ -217,6 +217,39 @@ describe('PopularScraper', () => {
       expect(movies).toHaveLength(2);
     });
 
+    it('should apply oldest strategy to AJAX URL', async () => {
+      const mockHtml = `
+        <div class="react-component" data-target-link="/film/movie1/"></div>
+      `;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        text: async () => mockHtml,
+      });
+
+      const mockMovie = {
+        id: 1,
+        name: 'Movie 1',
+        slug: '/film/movie1/',
+        tmdbId: '123',
+        imdbId: null,
+        publishedYear: null,
+      };
+
+      (getMovie as jest.Mock).mockResolvedValueOnce(mockMovie);
+
+      const scraper = new PopularScraper(
+        'https://letterboxd.com/films/popular/',
+        undefined,
+        'oldest'
+      );
+      await scraper.getMovies();
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://letterboxd.com/films/ajax/popular/by/release-date-earliest/'
+      );
+    });
+
     it('should throw error for fetch failure', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: false,
@@ -226,6 +259,77 @@ describe('PopularScraper', () => {
       const scraper = new PopularScraper('https://letterboxd.com/films/popular');
 
       await expect(scraper.getMovies()).rejects.toThrow('Failed to fetch popular movies page: 404');
+    });
+
+    it('should skip movies that fail to scrape and continue with the rest', async () => {
+      const mockHtml = `
+        <div class="react-component" data-target-link="/film/good/"></div>
+        <div class="react-component" data-target-link="/film/bad/"></div>
+        <div class="react-component" data-target-link="/film/also-good/"></div>
+      `;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        text: async () => mockHtml,
+      });
+
+      const good = {
+        id: 1,
+        name: 'Good',
+        slug: '/film/good/',
+        tmdbId: '1',
+        imdbId: null,
+        publishedYear: null,
+      };
+      const alsoGood = {
+        id: 3,
+        name: 'Also Good',
+        slug: '/film/also-good/',
+        tmdbId: '3',
+        imdbId: null,
+        publishedYear: null,
+      };
+
+      (getMovie as jest.Mock)
+        .mockResolvedValueOnce(good)
+        .mockRejectedValueOnce(new Error('boom'))
+        .mockResolvedValueOnce(alsoGood);
+
+      const scraper = new PopularScraper('https://letterboxd.com/films/popular');
+      const movies = await scraper.getMovies();
+
+      expect(movies).toHaveLength(2);
+      expect(movies).toEqual(expect.arrayContaining([good, alsoGood]));
+    });
+
+    it('should tolerate non-Error rejection values from getMovie', async () => {
+      const mockHtml = `
+        <div class="react-component" data-target-link="/film/good/"></div>
+        <div class="react-component" data-target-link="/film/bad/"></div>
+      `;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        text: async () => mockHtml,
+      });
+
+      const good = {
+        id: 1,
+        name: 'Good',
+        slug: '/film/good/',
+        tmdbId: '1',
+        imdbId: null,
+        publishedYear: null,
+      };
+
+      (getMovie as jest.Mock)
+        .mockResolvedValueOnce(good)
+        .mockRejectedValueOnce('string error, not an Error instance');
+
+      const scraper = new PopularScraper('https://letterboxd.com/films/popular');
+      const movies = await scraper.getMovies();
+
+      expect(movies).toEqual([good]);
     });
   });
 });
